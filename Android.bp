@@ -12,22 +12,3 @@ license {
         "LICENSE.txt",
     ],
 }
-
-java_library_host {
-    name: "kotlinpoet",
-    srcs: ["kotlinpoet/src/main/**/*.kt"],
-    static_libs: [
-        "kotlin-stdlib-jdk8",
-        "kotlin-reflect",
-    ]
-}
-
-java_library_host {
-    name: "kotlinpoet-javapoet",
-    srcs: ["interop/javapoet/src/main/**/*.kt"],
-    static_libs: [
-        "javapoet",
-        "kotlin-stdlib-jdk8",
-        "kotlinpoet"
-    ]
-}
