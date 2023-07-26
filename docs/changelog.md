@@ -1,6 +1,124 @@
 Change Log
 ==========
 
+## Unreleased
+
+## Version 1.14.2
+
+_2023-05-30_
+
+ * Fix: Fix one more missing API in binary compatibility override in `Annotatable.Builder` (#1581).
+
+## Version 1.14.1
+
+_2023-05-29_
+
+ * Fix: Restore ABI stability for annotatable and documentable builders (#1580).
+
+## Version 1.14.0
+
+_2023-05-29_
+
+Thanks to [@Omico][Omico], [@drawers][drawers], [@RBusarow][RBusarow] for contributing to this release.
+
+ * New: Kotlin 1.8.21.
+ * New: KSP 1.8.21-1.0.11.
+ * New: Enable default methods in Java bytecode (#1561).
+ * New: Group Kotlin and Renovate updates together in Renovate (#1562).
+ * New: Extract trait interface for annotatable constructs and their builders (#1564).
+ * New: Extract trait interface for documentable constructs and their builders (#1571).
+ * New: Document the usage of `STAR` (#1572).
+ * New: Add builder for `FunSpec` which accepts a `MemberName` (#1574).
+ * Fix: Omit public modifier on override function or constructor parameters (#1550).
+ * Fix: Correct handling of members in various types (#1558).
+ * Fix: Function return types now default to `Unit` unless explicitly set (#1559).
+
+    Previously, when `FunSpec` didn't have a return type specified and an expression body was produced, no return
+    type would be emitted. However, starting from `1.14.0`, KotlinPoet will not add `Unit` as a return type in such
+    cases. In order to correct the generated output, you are to specify the actual return type of the `FunSpec`.
+
+    Before `1.14.0`, if omitted, no return type is produced:
+    ```kotlin
+    val funSpec = FunSpec.builder("foo")
+      .addStatement("return 1")
+      .build()
+    ```
+    ```kotlin
+    public fun foo() = 1
+    ```
+
+    From `1.14.0`, the return type defaults to `Unit` if not otherwise set:
+    ```kotlin
+    val funSpec = FunSpec.builder("foo")
+      .addStatement("return 1")
+      .build()
+    ```
+    ```kotlin
+    public fun foo(): Unit = 1 // ❌
+    ```
+
+    To fix it, explicitly define the return type:
+    ```diff
+     val funSpec = FunSpec.builder("foo")
+    +  .returns(INT)
+       .addStatement("return 1")
+       .build()
+    ```
+    ```kotlin
+    public fun foo(): Int = 1 // ✅
+    ```
+
+    Additionally, as part of this change, `FunSpec.returnType` has changed to be non-nullable. This is a source- and
+    binary-compatible change, although if you were performing null-checks then new warnings may appear after upgrade.
+
+ * Fix: Append nested class names to alias during name lookup (#1568).
+ * Fix: Allow PropertySpec with context receivers and without getter or setter (#1575).
+
+## Version 1.13.2
+
+_2023-05-05_
+
+Thanks to [@Squiry][Squiry] for contributing to this release.
+
+* Fix: `KSType.toTypeName` fixed to work with aliased types (#1534).
+
+## Version 1.13.1
+
+_2023-04-28_
+
+Thanks to [@rickclephas][rickclephas] for contributing to this release.
+
+ * Fix: Look at canonical names instead of just package names when generating import aliases (#1519).
+ * Fix: Ignore KSP annotation arguments without a value (#1523).
+ * Fix: Fix arguments handling in `KSType.toTypeName()` (#1529).
+
+## Version 1.13.0
+
+_2023-04-06_
+
+Thanks to [@popematt][popematt], [@bitPogo][bitPogo], [@mars885][mars885], [@sjudd][sjudd], [@Sironheart][Sironheart],
+[@polarene][polarene], [@DeoTimeTheGithubUser][DeoTimeTheGithubUser], [@drawers][drawers] for contributing to this release.
+
+ * New: Kotlin 1.8.0.
+ * New: KSP 1.8.0-1.0.9.
+ * New: Support context receivers on TypeSpecs + extract ContextReceivable API (#1269).
+ * New: Optimize `OriginatingElements` and `TagMap` implementations (#1270).
+ * New: Auto-generate import aliases for types and members (#1355).
+ * New: Insert underscores into large decimal literals (#1384).
+ * New: New factory function `FileSpec.builder(ClassName)` (#1397).
+ * Fix: Fix StackOverflowError when calling `KSTypeArgument.toTypeName()` for a wildcard in a recursive type bound (#1272).
+ * Fix: Fix transitive aliases (#1306).
+ * Fix: Fix Aliases as TypeArgument (#1321).
+ * Fix: Don't escape special characters inside raw strings (#1331).
+ * Fix: Fix KSP interop's output of the annotation parameter value of type Char (#1338).
+ * Fix: Fix KSP interop's output for primitive arrays (#1340).
+ * Fix: Avoid emitting public if `shouldEmitPublicModifier` returns false (#1342).
+ * Fix: Fix context receivers being rendered in an incorrect position when on a nullable/suspending `LambdaTypeName` (#1454).
+ * Fix: Do not use `bestGuess` for `KClass.asClassName` (#1469).
+ * Fix: Handle fake nested types with platform mapped parents (#1472).
+ * Fix: Fix `TypeName` equals (#1477).
+ * Fix: Make equals consistent with compareTo for `ClassName` (#1506).
+
 ## Version 1.12.0
 
 _2022-06-13_
@@ -586,3 +704,15 @@ _2017-05-16_
  [aksh1618]: https://github.com/aksh1618
  [zsqw123]: https://github.com/zsqw123
  [roihershberg]: https://github.com/roihershberg
+ [popematt]: https://github.com/popematt
+ [bitPogo]: https://github.com/bitPogo
+ [mars885]: https://github.com/mars885
+ [sjudd]: https://github.com/sjudd
+ [Sironheart]: https://github.com/Sironheart
+ [polarene]: https://github.com/polarene
+ [DeoTimeTheGithubUser]: https://github.com/DeoTimeTheGithubUser
+ [drawers]: https://github.com/drawers
+ [rickclephas]: https://github.com/rickclephas
+ [Squiry]: https://github.com/Squiry
+ [Omico]: https://github.com/Omico
+ [RBusarow]: https://github.com/RBusarow
