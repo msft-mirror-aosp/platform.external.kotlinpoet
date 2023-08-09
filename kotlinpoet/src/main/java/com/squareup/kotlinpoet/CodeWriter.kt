@@ -428,13 +428,14 @@ internal class CodeWriter constructor(
 
       // We don't care about nullability and type annotations here, as it's irrelevant for imports.
       if (resolved == c.copy(nullable = false, annotations = emptyList())) {
-        if (alias != null) return alias
-        val suffixOffset = c.simpleNames.size - 1
-        referencedNames.add(className.topLevelClassName().simpleName)
-        return className.simpleNames.subList(
-          suffixOffset,
+        if (alias == null) {
+          referencedNames.add(className.topLevelClassName().simpleName)
+        }
+        val nestedClassNames = className.simpleNames.subList(
+          c.simpleNames.size,
           className.simpleNames.size,
         ).joinToString(".")
+        return "$simpleName.$nestedClassNames"
       }
       c = c.enclosingClassName()
     }
@@ -616,7 +617,7 @@ internal class CodeWriter constructor(
   }
 
   private fun emitIndentation() {
-    for (j in 0 until indentLevel) {
+    for (j in 0..<indentLevel) {
       out.appendNonWrapping(indent)
     }
   }
@@ -636,6 +637,10 @@ internal class CodeWriter constructor(
   ): Boolean {
     if (modifiers.contains(KModifier.PUBLIC)) {
       return true
+    }
+
+    if (implicitModifiers.contains(KModifier.PUBLIC) && modifiers.contains(KModifier.OVERRIDE)) {
+      return false
     }
 
     if (!implicitModifiers.contains(KModifier.PUBLIC)) {
@@ -706,14 +711,12 @@ internal class CodeWriter constructor(
         .generateImports(
           generatedImports,
           canonicalName = ClassName::canonicalName,
-          packageName = ClassName::packageName,
           capitalizeAliases = true,
         )
       val suggestedMemberImports = importsCollector.suggestedMemberImports()
         .generateImports(
           generatedImports,
           canonicalName = MemberName::canonicalName,
-          packageName = MemberName::packageName,
           capitalizeAliases = false,
         )
       importsCollector.close()
@@ -730,7 +733,6 @@ internal class CodeWriter constructor(
     private fun <T> Map<String, Set<T>>.generateImports(
       generatedImports: MutableMap<String, Import>,
       canonicalName: T.() -> String,
-      packageName: T.() -> String,
       capitalizeAliases: Boolean,
     ): Map<String, T> {
       return flatMap { (simpleName, qualifiedNames) ->
@@ -740,7 +742,7 @@ internal class CodeWriter constructor(
             generatedImports[canonicalName] = Import(canonicalName)
           }
         } else {
-          generateImportAliases(simpleName, qualifiedNames, packageName, capitalizeAliases)
+          generateImportAliases(simpleName, qualifiedNames, canonicalName, capitalizeAliases)
             .onEach { (alias, qualifiedName) ->
               val canonicalName = qualifiedName.canonicalName()
               generatedImports[canonicalName] = Import(canonicalName, alias)
@@ -752,11 +754,14 @@ internal class CodeWriter constructor(
     private fun <T> generateImportAliases(
       simpleName: String,
       qualifiedNames: Set<T>,
-      packageName: T.() -> String,
+      canonicalName: T.() -> String,
       capitalizeAliases: Boolean,
     ): List<Pair<String, T>> {
-      val packageNameSegments = qualifiedNames.associateWith { qualifiedName ->
-        qualifiedName.packageName().split('.').map { it.replaceFirstChar(Char::uppercaseChar) }
+      val canonicalNameSegments = qualifiedNames.associateWith { qualifiedName ->
+        qualifiedName.canonicalName().split('.')
+          .dropLast(1) // Last segment of the canonical name is the simple name, drop it to avoid repetition.
+          .filter { it != "Companion" }
+          .map { it.replaceFirstChar(Char::uppercaseChar) }
       }
       val aliasNames = mutableMapOf<String, T>()
       var segmentsToUse = 0
@@ -764,7 +769,7 @@ internal class CodeWriter constructor(
       while (aliasNames.size != qualifiedNames.size) {
         segmentsToUse += 1
         aliasNames.clear()
-        for ((qualifiedName, segments) in packageNameSegments) {
+        for ((qualifiedName, segments) in canonicalNameSegments) {
           val aliasPrefix = segments.takeLast(min(segmentsToUse, segments.size))
             .joinToString(separator = "")
             .replaceFirstChar { if (!capitalizeAliases) it.lowercaseChar() else it }

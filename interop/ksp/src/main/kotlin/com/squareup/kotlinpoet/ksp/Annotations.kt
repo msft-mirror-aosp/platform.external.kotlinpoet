@@ -28,8 +28,12 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.ParameterizedTypeName
 
-/** Returns an [AnnotationSpec] representation of this [KSAnnotation] instance. */
-public fun KSAnnotation.toAnnotationSpec(): AnnotationSpec {
+/**
+ * Returns an [AnnotationSpec] representation of this [KSAnnotation] instance.
+ * @param omitDefaultValues omit defining default values when `true`
+ */
+@JvmOverloads
+public fun KSAnnotation.toAnnotationSpec(omitDefaultValues: Boolean = false): AnnotationSpec {
   val builder = when (val type = annotationType.resolve().unwrapTypeAlias().toTypeName()) {
     is ClassName -> AnnotationSpec.builder(type)
     is ParameterizedTypeName -> AnnotationSpec.builder(type)
@@ -38,13 +42,33 @@ public fun KSAnnotation.toAnnotationSpec(): AnnotationSpec {
   useSiteTarget?.let { builder.useSiteTarget(it.kpAnalog) }
   // TODO support type params once they're exposed https://github.com/google/ksp/issues/753
   for (argument in arguments) {
-    val member = CodeBlock.builder()
+    val value = argument.value ?: continue
     val name = argument.name!!.getShortName()
+    if (omitDefaultValues) {
+      val defaultValue = this.defaultArguments.firstOrNull { it.name?.asString() == name }?.value
+      if (isDefaultValue(value, defaultValue)) { continue }
+    }
+    val member = CodeBlock.builder()
     member.add("%N = ", name)
-    addValueToBlock(argument.value!!, member)
+    addValueToBlock(value, member, omitDefaultValues)
     builder.addMember(member.build())
   }
   return builder.build()
+}
+
+private fun isDefaultValue(value: Any?, defaultValue: Any?): Boolean {
+  if (defaultValue == null) return false
+  if (value is KSAnnotation && defaultValue is KSAnnotation) {
+    return defaultValue.defaultArguments.all { defaultValueArg ->
+      isDefaultValue(value.arguments.firstOrNull { it.name == defaultValueArg.name }?.value, defaultValueArg.value)
+    }
+  }
+  if (value is List<*> && defaultValue is List<*>) {
+    return value.size == defaultValue.size && defaultValue.indices.all { index ->
+      isDefaultValue(value[index], defaultValue[index])
+    }
+  }
+  return value == defaultValue
 }
 
 private val AnnotationUseSiteTarget.kpAnalog: UseSiteTarget get() = when (this) {
@@ -67,7 +91,7 @@ internal fun KSType.unwrapTypeAlias(): KSType {
   }
 }
 
-private fun addValueToBlock(value: Any, member: CodeBlock.Builder) {
+private fun addValueToBlock(value: Any, member: CodeBlock.Builder, omitDefaultValues: Boolean) {
   when (value) {
     is List<*> -> {
       // Array type
@@ -85,7 +109,7 @@ private fun addValueToBlock(value: Any, member: CodeBlock.Builder) {
       member.add("$arrayType(⇥⇥")
       value.forEachIndexed { index, innerValue ->
         if (index > 0) member.add(", ")
-        addValueToBlock(innerValue!!, member)
+        addValueToBlock(innerValue!!, member, omitDefaultValues)
       }
       member.add("⇤⇤)")
     }
@@ -106,7 +130,7 @@ private fun addValueToBlock(value: Any, member: CodeBlock.Builder) {
         ClassName.bestGuess(value.getQualifier()),
         value.getShortName(),
       )
-    is KSAnnotation -> member.add("%L", value.toAnnotationSpec())
+    is KSAnnotation -> member.add("%L", value.toAnnotationSpec(omitDefaultValues))
     else -> member.add(memberForValue(value))
   }
 }

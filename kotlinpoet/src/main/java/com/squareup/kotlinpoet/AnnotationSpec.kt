@@ -22,7 +22,8 @@ import javax.lang.model.element.AnnotationValue
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.lang.model.type.TypeMirror
-import javax.lang.model.util.SimpleAnnotationValueVisitor7
+import javax.lang.model.util.SimpleAnnotationValueVisitor8
+import kotlin.LazyThreadSafetyMode.NONE
 import kotlin.reflect.KClass
 
 /** A generated annotation on a declaration. */
@@ -39,6 +40,13 @@ public class AnnotationSpec private constructor(
   public val typeName: TypeName = builder.typeName
   public val members: List<CodeBlock> = builder.members.toImmutableList()
   public val useSiteTarget: UseSiteTarget? = builder.useSiteTarget
+
+  /** Lazily-initialized toString of this AnnotationSpec.  */
+  private val cachedString by lazy(NONE) {
+    buildCodeString {
+      emit(this, inline = true, asParameter = false)
+    }
+  }
 
   internal fun emit(codeWriter: CodeWriter, inline: Boolean, asParameter: Boolean = false) {
     if (!asParameter) {
@@ -96,9 +104,7 @@ public class AnnotationSpec private constructor(
 
   override fun hashCode(): Int = toString().hashCode()
 
-  override fun toString(): String = buildCodeString {
-    emit(this, inline = true, asParameter = false)
-  }
+  override fun toString(): String = cachedString
 
   public enum class UseSiteTarget(internal val keyword: String) {
     FILE("file"),
@@ -156,7 +162,7 @@ public class AnnotationSpec private constructor(
   @OptIn(DelicateKotlinPoetApi::class)
   private class Visitor(
     val builder: CodeBlock.Builder,
-  ) : SimpleAnnotationValueVisitor7<CodeBlock.Builder, String>(builder) {
+  ) : SimpleAnnotationValueVisitor8<CodeBlock.Builder, String>(builder) {
 
     override fun defaultAction(o: Any, name: String) =
       builder.add(Builder.memberForValue(o))
@@ -209,7 +215,7 @@ public class AnnotationSpec private constructor(
           member.add("%L = ", method.name)
           if (value.javaClass.isArray) {
             member.add("arrayOf(⇥⇥")
-            for (i in 0 until Array.getLength(value)) {
+            for (i in 0..<Array.getLength(value)) {
               if (i > 0) member.add(", ")
               member.add(Builder.memberForValue(Array.get(value, i)))
             }

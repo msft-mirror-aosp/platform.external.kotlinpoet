@@ -16,6 +16,7 @@ license {
 java_library_host {
     name: "kotlinpoet",
     srcs: ["kotlinpoet/src/main/**/*.kt"],
+    kotlincflags: ["-Xjvm-default=all"],
     static_libs: [
         "kotlin-stdlib-jdk8",
         "kotlin-reflect",
@@ -25,6 +26,7 @@ java_library_host {
 java_library_host {
     name: "kotlinpoet-javapoet",
     srcs: ["interop/javapoet/src/main/**/*.kt"],
+    kotlincflags: ["-Xjvm-default=all"],
     static_libs: [
         "javapoet",
         "kotlin-stdlib-jdk8",
