@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 tasks.jar {
   manifest {
     attributes("Automatic-Module-Name" to "com.squareup.kotlinpoet")
@@ -21,8 +20,8 @@ tasks.jar {
 }
 
 tasks.compileTestKotlin {
-  kotlinOptions {
-    freeCompilerArgs = listOf("-opt-in=com.squareup.kotlinpoet.DelicateKotlinPoetApi")
+  compilerOptions {
+    freeCompilerArgs.add("-opt-in=com.squareup.kotlinpoet.DelicateKotlinPoetApi")
   }
 }
 
@@ -43,6 +42,7 @@ dependencies {
   implementation(libs.kotlin.reflect)
   testImplementation(libs.kotlin.junit)
   testImplementation(libs.truth)
+  testImplementation(libs.guava)
   testImplementation(libs.compileTesting)
   testImplementation(libs.jimfs)
   testImplementation(libs.ecj)

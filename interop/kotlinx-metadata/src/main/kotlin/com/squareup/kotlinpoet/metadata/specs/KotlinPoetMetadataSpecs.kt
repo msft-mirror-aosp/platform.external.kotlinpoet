@@ -22,6 +22,7 @@ import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget.FILE
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.DelicateKotlinPoetApi
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.FunSpec.Builder
@@ -36,15 +37,12 @@ import com.squareup.kotlinpoet.KModifier.FINAL
 import com.squareup.kotlinpoet.KModifier.INFIX
 import com.squareup.kotlinpoet.KModifier.INLINE
 import com.squareup.kotlinpoet.KModifier.INNER
-import com.squareup.kotlinpoet.KModifier.INTERNAL
 import com.squareup.kotlinpoet.KModifier.LATEINIT
 import com.squareup.kotlinpoet.KModifier.NOINLINE
 import com.squareup.kotlinpoet.KModifier.OPEN
 import com.squareup.kotlinpoet.KModifier.OPERATOR
 import com.squareup.kotlinpoet.KModifier.PRIVATE
-import com.squareup.kotlinpoet.KModifier.PROTECTED
 import com.squareup.kotlinpoet.KModifier.PUBLIC
-import com.squareup.kotlinpoet.KModifier.SEALED
 import com.squareup.kotlinpoet.KModifier.SUSPEND
 import com.squareup.kotlinpoet.KModifier.TAILREC
 import com.squareup.kotlinpoet.KModifier.VALUE
@@ -57,58 +55,21 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.UNIT
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import com.squareup.kotlinpoet.metadata.PropertyAccessorFlag
-import com.squareup.kotlinpoet.metadata.PropertyAccessorFlag.IS_EXTERNAL
-import com.squareup.kotlinpoet.metadata.PropertyAccessorFlag.IS_INLINE
-import com.squareup.kotlinpoet.metadata.PropertyAccessorFlag.IS_NOT_DEFAULT
 import com.squareup.kotlinpoet.metadata.classinspectors.ClassInspectorUtil
 import com.squareup.kotlinpoet.metadata.classinspectors.ClassInspectorUtil.createAnnotations
 import com.squareup.kotlinpoet.metadata.classinspectors.ClassInspectorUtil.createClassName
 import com.squareup.kotlinpoet.metadata.classinspectors.ClassInspectorUtil.toTreeSet
-import com.squareup.kotlinpoet.metadata.declaresDefaultValue
-import com.squareup.kotlinpoet.metadata.hasAnnotations
-import com.squareup.kotlinpoet.metadata.hasGetter
-import com.squareup.kotlinpoet.metadata.hasSetter
-import com.squareup.kotlinpoet.metadata.isAbstract
 import com.squareup.kotlinpoet.metadata.isAnnotation
 import com.squareup.kotlinpoet.metadata.isClass
 import com.squareup.kotlinpoet.metadata.isCompanionObject
-import com.squareup.kotlinpoet.metadata.isConst
-import com.squareup.kotlinpoet.metadata.isCrossInline
-import com.squareup.kotlinpoet.metadata.isData
 import com.squareup.kotlinpoet.metadata.isDeclaration
-import com.squareup.kotlinpoet.metadata.isDelegated
-import com.squareup.kotlinpoet.metadata.isDelegation
 import com.squareup.kotlinpoet.metadata.isEnum
-import com.squareup.kotlinpoet.metadata.isEnumEntry
-import com.squareup.kotlinpoet.metadata.isExpect
-import com.squareup.kotlinpoet.metadata.isExternal
-import com.squareup.kotlinpoet.metadata.isFinal
-import com.squareup.kotlinpoet.metadata.isFun
-import com.squareup.kotlinpoet.metadata.isInfix
-import com.squareup.kotlinpoet.metadata.isInline
-import com.squareup.kotlinpoet.metadata.isInner
 import com.squareup.kotlinpoet.metadata.isInterface
-import com.squareup.kotlinpoet.metadata.isInternal
-import com.squareup.kotlinpoet.metadata.isLateinit
-import com.squareup.kotlinpoet.metadata.isNoInline
 import com.squareup.kotlinpoet.metadata.isObject
-import com.squareup.kotlinpoet.metadata.isOpen
-import com.squareup.kotlinpoet.metadata.isOperator
 import com.squareup.kotlinpoet.metadata.isPrimary
-import com.squareup.kotlinpoet.metadata.isPrivate
-import com.squareup.kotlinpoet.metadata.isProtected
-import com.squareup.kotlinpoet.metadata.isPublic
-import com.squareup.kotlinpoet.metadata.isReified
-import com.squareup.kotlinpoet.metadata.isSealed
-import com.squareup.kotlinpoet.metadata.isSuspend
-import com.squareup.kotlinpoet.metadata.isSynthesized
-import com.squareup.kotlinpoet.metadata.isTailRec
 import com.squareup.kotlinpoet.metadata.isVal
-import com.squareup.kotlinpoet.metadata.isValue
-import com.squareup.kotlinpoet.metadata.isVar
-import com.squareup.kotlinpoet.metadata.propertyAccessorFlags
 import com.squareup.kotlinpoet.metadata.specs.JvmMethodModifier.DEFAULT
+import com.squareup.kotlinpoet.metadata.toKModifier
 import com.squareup.kotlinpoet.metadata.toKmClass
 import com.squareup.kotlinpoet.tag
 import java.util.Locale
@@ -117,21 +78,49 @@ import javax.lang.model.element.ElementKind
 import javax.lang.model.element.PackageElement
 import javax.lang.model.element.TypeElement
 import kotlin.reflect.KClass
-import kotlinx.metadata.Flags
+import kotlinx.metadata.ClassKind
 import kotlinx.metadata.KmClass
 import kotlinx.metadata.KmClassifier
 import kotlinx.metadata.KmConstructor
 import kotlinx.metadata.KmFunction
 import kotlinx.metadata.KmPackage
 import kotlinx.metadata.KmProperty
+import kotlinx.metadata.KmPropertyAccessorAttributes
 import kotlinx.metadata.KmType
 import kotlinx.metadata.KmTypeAlias
 import kotlinx.metadata.KmValueParameter
+import kotlinx.metadata.Modality
+import kotlinx.metadata.Visibility
+import kotlinx.metadata.declaresDefaultValue
+import kotlinx.metadata.hasAnnotations
+import kotlinx.metadata.hasGetter
+import kotlinx.metadata.hasSetter
+import kotlinx.metadata.isConst
+import kotlinx.metadata.isCrossinline
+import kotlinx.metadata.isData
+import kotlinx.metadata.isDelegated
+import kotlinx.metadata.isExpect
+import kotlinx.metadata.isExternal
+import kotlinx.metadata.isFunInterface
+import kotlinx.metadata.isInfix
+import kotlinx.metadata.isInline
+import kotlinx.metadata.isInner
+import kotlinx.metadata.isLateinit
+import kotlinx.metadata.isNoinline
+import kotlinx.metadata.isOperator
+import kotlinx.metadata.isReified
+import kotlinx.metadata.isSuspend
+import kotlinx.metadata.isTailrec
+import kotlinx.metadata.isValue
+import kotlinx.metadata.isVar
 import kotlinx.metadata.jvm.JvmMethodSignature
 import kotlinx.metadata.jvm.getterSignature
-import kotlinx.metadata.jvm.jvmInternalName
 import kotlinx.metadata.jvm.setterSignature
 import kotlinx.metadata.jvm.signature
+import kotlinx.metadata.jvm.toJvmInternalName
+import kotlinx.metadata.kind
+import kotlinx.metadata.modality
+import kotlinx.metadata.visibility
 
 /** @return a [TypeSpec] ABI representation of this [KClass]. */
 @KotlinPoetMetadataPreview
@@ -140,13 +129,14 @@ public fun KClass<*>.toTypeSpec(
 ): TypeSpec = java.toTypeSpec(classInspector)
 
 /** @return a [TypeSpec] ABI representation of this [KClass]. */
+@OptIn(DelicateKotlinPoetApi::class)
 @KotlinPoetMetadataPreview
 public fun Class<*>.toTypeSpec(
   classInspector: ClassInspector? = null,
 ): TypeSpec = toKmClass().toTypeSpec(classInspector, asClassName())
 
 /** @return a [TypeSpec] ABI representation of this [TypeElement]. */
-@Suppress("DEPRECATION")
+@OptIn(DelicateKotlinPoetApi::class)
 @KotlinPoetMetadataPreview
 public fun TypeElement.toTypeSpec(
   classInspector: ClassInspector? = null,
@@ -260,7 +250,7 @@ private fun KmClass.toTypeSpec(
   parentClassName: ClassName?,
 ): TypeSpec {
   val classTypeParamsResolver = typeParameters.toTypeParameterResolver()
-  val jvmInternalName = name.jvmInternalName
+  val jvmInternalName = name.toJvmInternalName()
   val simpleName = className.simpleName
   val classData = classInspector?.containerData(className, parentClassName)
   check(classData is ClassData?) {
@@ -271,16 +261,17 @@ private fun KmClass.toTypeSpec(
     isAnnotation -> TypeSpec.annotationBuilder(simpleName)
     isCompanionObject -> TypeSpec.companionObjectBuilder(companionObjectName(simpleName))
     isEnum -> TypeSpec.enumBuilder(simpleName)
-    isExpect -> TypeSpec.expectClassBuilder(simpleName)
+    isExpect -> TypeSpec.classBuilder(simpleName).addModifiers(EXPECT)
     isObject -> TypeSpec.objectBuilder(simpleName)
     isInterface -> {
-      if (classData?.declarationContainer?.isFun == true) {
+      if (classData?.declarationContainer?.isFunInterface == true) {
         TypeSpec.funInterfaceBuilder(simpleName)
       } else {
         TypeSpec.interfaceBuilder(simpleName)
       }
     }
-    isEnumEntry -> TypeSpec.anonymousClassBuilder()
+
+    kind == ClassKind.ENUM_ENTRY -> TypeSpec.anonymousClassBuilder()
     else -> TypeSpec.classBuilder(simpleName)
   }
 
@@ -290,7 +281,7 @@ private fun KmClass.toTypeSpec(
     }
     ?.let(builder::addAnnotations)
 
-  if (isEnum) {
+  if (kind == ClassKind.ENUM_CLASS) {
     enumEntries.forEach { entryName ->
       val typeSpec = if (classInspector != null) {
         val entry = classInspector.enumEntry(className, entryName)
@@ -313,14 +304,13 @@ private fun KmClass.toTypeSpec(
     }
   }
 
-  if (!isEnumEntry) {
-    visibilityFrom(flags) { builder.addModifiers(it) }
-    builder.addModifiers(
-      *flags.modalities
-        .filterNot { it == FINAL } // Default
-        .filterNot { isInterface && it == ABSTRACT } // Abstract is a default on interfaces
-        .toTypedArray(),
-    )
+  if (kind != ClassKind.ENUM_ENTRY) {
+    visibilityFrom(visibility) { builder.addModifiers(it) }
+    modality
+      .takeUnless { it == Modality.FINAL } // Default
+      ?.takeUnless { kind == ClassKind.INTERFACE && it == Modality.ABSTRACT } // Abstract is a default on interfaces
+      ?.let(Modality::toKModifier)
+      ?.let { builder.addModifiers(it) }
     if (isData) {
       builder.addModifiers(DATA)
     }
@@ -387,8 +377,7 @@ private fun KmClass.toTypeSpec(
     builder.addProperties(
       properties
         .asSequence()
-        .filter { it.isDeclaration }
-        .filterNot { it.isSynthesized }
+        .filter { it.kind.isDeclaration }
         .map { it to classData?.properties?.get(it) }
         .map { (property, propertyData) ->
           property.toPropertySpec(
@@ -419,9 +408,7 @@ private fun KmClass.toTypeSpec(
   builder.addFunctions(
     functions
       .asSequence()
-      .filter { it.isDeclaration }
-      .filterNot { it.isDelegation }
-      .filterNot { it.isSynthesized }
+      .filter { it.kind.isDeclaration }
       .map { it to classData?.methods?.get(it) }
       .map { (func, methodData) ->
         func.toFunSpec(classTypeParamsResolver, classInspector, classData, methodData)
@@ -431,11 +418,11 @@ private fun KmClass.toTypeSpec(
             fun isKotlinDefaultInterfaceMethod(): Boolean {
               classInspector?.let { handler ->
                 func.signature?.let { signature ->
-                  val suffix = signature.desc.removePrefix("(")
+                  val suffix = signature.descriptor.removePrefix("(")
                   return handler.methodExists(
                     className.nestedClass("DefaultImpls"),
                     signature.copy(
-                      desc = "(L$jvmInternalName;$suffix",
+                      descriptor = "(L$jvmInternalName;$suffix",
                     ),
                   )
                 }
@@ -504,7 +491,7 @@ private fun KmConstructor.toFunSpec(
   return FunSpec.constructorBuilder()
     .apply {
       addAnnotations(constructorData?.allAnnotations.orEmpty())
-      visibilityFrom(flags) { addModifiers(it) }
+      visibilityFrom(visibility) { addModifiers(it) }
       addParameters(
         this@toFunSpec.valueParameters.mapIndexed { index, param ->
           param.toParameterSpec(
@@ -516,7 +503,7 @@ private fun KmConstructor.toFunSpec(
           )
         },
       )
-      if (!isPrimary) {
+      if (!this@toFunSpec.isPrimary) {
         // TODO How do we know when to add callSuperConstructor()?
       }
     }
@@ -563,14 +550,14 @@ private fun KmFunction.toFunSpec(
   return FunSpec.builder(name)
     .apply {
       addAnnotations(annotations)
-      visibilityFrom(flags) { addModifiers(it) }
+      visibilityFrom(visibility) { addModifiers(it) }
       val isOverride = methodData?.isOverride == true
-      addModifiers(
-        flags.modalities
-          .filterNot { it == FINAL && !isOverride } // Final is the default
-          .filterNot { it == OPEN && isOverride } // Overrides are implicitly open
-          .filterNot { it == OPEN && isInInterface }, // interface methods are implicitly open
-      )
+      modality
+        .takeUnless { it == Modality.FINAL && !isOverride } // Final is the default
+        ?.takeUnless { it == Modality.OPEN && isOverride } // Overrides are implicitly open
+        ?.takeUnless { it == Modality.OPEN && isInInterface } // interface methods are implicitly open
+        ?.let(Modality::toKModifier)
+        ?.let { addModifiers(it) }
       if (valueParameters.isNotEmpty()) {
         addParameters(
           valueParameters.mapIndexed { index, param ->
@@ -597,7 +584,7 @@ private fun KmFunction.toFunSpec(
       if (isInline) {
         addModifiers(INLINE)
       }
-      if (isTailRec) {
+      if (isTailrec) {
         addModifiers(TAILREC)
       }
       if (isExternal) {
@@ -612,7 +599,7 @@ private fun KmFunction.toFunSpec(
       val returnTypeName = this@toFunSpec.returnType.toTypeName(typeParamsResolver)
       if (returnTypeName != UNIT) {
         returns(returnTypeName)
-        if (!flags.isAbstract) {
+        if (modality != Modality.ABSTRACT) {
           addStatement(NOT_IMPLEMENTED)
         }
       }
@@ -627,17 +614,17 @@ private fun KmValueParameter.toParameterSpec(
   typeParamResolver: TypeParameterResolver,
   annotations: Collection<AnnotationSpec>,
 ): ParameterSpec {
-  val paramType = varargElementType ?: type ?: throw IllegalStateException("No argument type!")
+  val paramType = varargElementType ?: type
   return ParameterSpec.builder(name, paramType.toTypeName(typeParamResolver))
     .apply {
       addAnnotations(annotations)
       if (varargElementType != null) {
         addModifiers(VARARG)
       }
-      if (isCrossInline) {
+      if (isCrossinline) {
         addModifiers(CROSSINLINE)
       }
-      if (isNoInline) {
+      if (isNoinline) {
         addModifiers(NOINLINE)
       }
       if (declaresDefaultValue) {
@@ -664,8 +651,7 @@ private fun KmProperty.toPropertySpec(
     if (hasGetter) {
       getterSignature?.let { getterSignature ->
         if (!containerData.isInterface &&
-          !flags.isOpen &&
-          !flags.isAbstract
+          modality != Modality.OPEN && modality != Modality.ABSTRACT
         ) {
           // Infer if JvmName was used
           // We skip interface types or open/abstract properties because they can't have @JvmName.
@@ -694,8 +680,7 @@ private fun KmProperty.toPropertySpec(
           !containerData.declarationContainer.isAnnotation &&
           !containerData.declarationContainer.isInterface &&
           classInspector?.supportsNonRuntimeRetainedAnnotations == false &&
-          !flags.isOpen &&
-          !flags.isAbstract
+          modality != Modality.OPEN && modality != Modality.ABSTRACT
         ) {
           // Infer if JvmName was used
           // We skip annotation types for this because they can't have vars.
@@ -732,14 +717,14 @@ private fun KmProperty.toPropertySpec(
         }
         .toTreeSet()
       addAnnotations(finalAnnotations)
-      visibilityFrom(flags) { addModifiers(it) }
-      addModifiers(
-        flags.modalities
-          .filterNot { it == FINAL && !isOverride } // Final is the default
-          .filterNot { it == OPEN && isOverride } // Overrides are implicitly open
-          .filterNot { it == OPEN && isInInterface } // Interface properties implicitly open
-          .filterNot { it == ABSTRACT && isInInterface }, // Interface properties implicitly abstract
-      )
+      visibilityFrom(visibility) { addModifiers(it) }
+      modality
+        .takeUnless { it == Modality.FINAL && !isOverride } // Final is the default
+        ?.takeUnless { it == Modality.OPEN && isOverride } // Overrides are implicitly open
+        ?.takeUnless { it == Modality.OPEN && isInInterface } // Interface properties implicitly open
+        ?.takeUnless { it == Modality.ABSTRACT && isInInterface } // Interface properties implicitly abstract
+        ?.let(Modality::toKModifier)
+        ?.let { addModifiers(it) }
       if (isOverride) {
         addModifiers(KModifier.OVERRIDE)
       }
@@ -782,7 +767,7 @@ private fun KmProperty.toPropertySpec(
           constant != null -> initializer(constant)
           isConstructorParam -> initializer(name)
           returnTypeName.isNullable -> initializer("null")
-          flags.isAbstract || isInInterface -> {
+          modality == Modality.ABSTRACT || isInInterface -> {
             // No-op, don't emit an initializer for abstract or interface properties
           }
           else -> initializer(NOT_IMPLEMENTED)
@@ -792,16 +777,16 @@ private fun KmProperty.toPropertySpec(
       // since the delegate handles it
       // vals with initialized constants have a getter in bytecode but not a body in kotlin source
       val modifierSet = modifiers.toSet()
-      if (hasGetter && !isDelegated && !flags.isAbstract) {
+      if (hasGetter && !isDelegated && modality != Modality.ABSTRACT) {
         propertyAccessor(
           modifierSet,
-          getterFlags,
+          getter,
           FunSpec.getterBuilder().addStatement(NOT_IMPLEMENTED),
           isOverride,
         )?.let(::getter)
       }
-      if (hasSetter && !isDelegated && !flags.isAbstract) {
-        propertyAccessor(modifierSet, setterFlags, FunSpec.setterBuilder(), isOverride)?.let(::setter)
+      if (hasSetter && !isDelegated && modality != Modality.ABSTRACT) {
+        propertyAccessor(modifierSet, setter!!, FunSpec.setterBuilder(), isOverride)?.let(::setter)
       }
     }
     .tag(this)
@@ -811,26 +796,34 @@ private fun KmProperty.toPropertySpec(
 @KotlinPoetMetadataPreview
 private fun propertyAccessor(
   propertyModifiers: Set<KModifier>,
-  flags: Flags,
+  attrs: KmPropertyAccessorAttributes,
   functionBuilder: Builder,
   isOverride: Boolean,
 ): FunSpec? {
-  val visibility = flags.visibility
+  val visibility = attrs.visibility.toKModifier()
   if (visibility == PUBLIC || visibility !in propertyModifiers) {
     // This is redundant and just a stub
     // For annotations on this accessor, we declare them on the property with site target instead
     return null
   }
-  val modalities = flags.modalities
-    .filterNot { it == FINAL && !isOverride }
-    .filterNot { it == OPEN && isOverride }
-  val propertyAccessorFlags = flags.propertyAccessorFlags
-  return if (visibility != PUBLIC || modalities.isNotEmpty() || propertyAccessorFlags.isNotEmpty()) {
+  val modality = attrs.modality
+    .takeUnless { it == Modality.FINAL && !isOverride }
+    .takeUnless { it == Modality.OPEN && isOverride }
+
+  val localModifiers = buildList {
+    if (attrs.isExternal) {
+      add(EXTERNAL)
+    }
+    if (attrs.isInline) {
+      add(INLINE)
+    }
+  }
+  return if (modality != null || localModifiers.isNotEmpty()) {
     functionBuilder
       .apply {
         addModifiers(visibility)
-        addModifiers(modalities)
-        addModifiers(*propertyAccessorFlags.toKModifiersArray())
+        modality?.let { addModifiers(it.toKModifier()) }
+        addModifiers(localModifiers)
       }
       .build()
   } else {
@@ -838,25 +831,15 @@ private fun propertyAccessor(
   }
 }
 
-private fun Set<PropertyAccessorFlag>.toKModifiersArray(): Array<KModifier> {
-  return mapNotNull {
-    when (it) {
-      IS_EXTERNAL -> EXTERNAL
-      IS_INLINE -> INLINE
-      IS_NOT_DEFAULT -> null // Gracefully skip over these
-    }
-  }.toTypedArray()
-}
-
 @KotlinPoetMetadataPreview
 private fun KmTypeAlias.toTypeAliasSpec(): TypeAliasSpec {
   val typeParamResolver = typeParameters.toTypeParameterResolver()
   return TypeAliasSpec.builder(name, underlyingType.toTypeName(typeParamResolver))
     .apply {
-      visibilityFrom(flags) {
+      visibilityFrom(visibility) {
         addModifiers(it)
       }
-      if (flags.hasAnnotations) {
+      if (hasAnnotations) {
         val annotationSpecs = this@toTypeAliasSpec.annotations
           .map { it.toAnnotationSpec() }
         addAnnotations(annotationSpecs)
@@ -886,21 +869,8 @@ private val JAVA_ANNOTATION_ANNOTATIONS = setOf(
 )
 
 @KotlinPoetMetadataPreview
-private val Flags.visibility: KModifier
-  get() = when {
-    isInternal -> INTERNAL
-    isPrivate -> PRIVATE
-    isProtected -> PROTECTED
-    isPublic -> PUBLIC
-    else -> {
-      // IS_PRIVATE_TO_THIS or IS_LOCAL, so just default to public
-      PUBLIC
-    }
-  }
-
-@KotlinPoetMetadataPreview
-private fun visibilityFrom(flags: Flags, body: (KModifier) -> Unit) {
-  val modifierVisibility = flags.visibility
+private fun visibilityFrom(visibility: Visibility, body: (KModifier) -> Unit) {
+  val modifierVisibility = visibility.toKModifier()
   if (modifierVisibility != PUBLIC) {
     body(modifierVisibility)
   }
@@ -910,23 +880,6 @@ private fun String.safeCapitalize(locale: Locale): String {
   return replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
 }
 
-@KotlinPoetMetadataPreview
-private val Flags.modalities: Set<KModifier>
-  get() = setOf {
-    if (isFinal) {
-      add(FINAL)
-    }
-    if (isOpen) {
-      add(OPEN)
-    }
-    if (isAbstract) {
-      add(ABSTRACT)
-    }
-    if (isSealed) {
-      add(SEALED)
-    }
-  }
-
 private inline fun <E> setOf(body: MutableSet<E>.() -> Unit): Set<E> {
   return mutableSetOf<E>().apply(body).toSet()
 }
@@ -934,7 +887,7 @@ private inline fun <E> setOf(body: MutableSet<E>.() -> Unit): Set<E> {
 private val METADATA = Metadata::class.asClassName()
 
 @Suppress("DEPRECATION")
-private val JVM_DEFAULT = JvmDefault::class.asClassName()
+private val JVM_DEFAULT = ClassName("kotlin.jvm", "JvmDefault")
 private val JVM_STATIC = JvmStatic::class.asClassName()
 
 @PublishedApi
