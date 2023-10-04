@@ -13,14 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 plugins {
   id("com.google.devtools.ksp")
 }
 
+tasks.compileTestKotlin {
+  compilerOptions {
+    freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
+  }
+}
+
 dependencies {
-  implementation(project(":kotlinpoet"))
-  implementation(project(":interop:ksp"))
+  implementation(projects.kotlinpoet)
+  implementation(projects.interop.ksp)
   implementation(libs.autoService)
   compileOnly(libs.ksp.api)
   ksp(libs.autoService.ksp)

@@ -17,6 +17,7 @@ package com.squareup.kotlinpoet
 
 import com.google.common.truth.Truth.assertThat
 import com.google.testing.compile.CompilationRule
+import com.squareup.kotlinpoet.Cased.Weird.Sup
 import org.junit.Rule
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -109,6 +110,25 @@ class ClassNameTest {
       .isEqualTo("kotlin.Any")
     assertThat(OuterClass.InnerClass::class.asClassName().toString())
       .isEqualTo("com.squareup.kotlinpoet.ClassNameTest.OuterClass.InnerClass")
+
+    // Note: Do NOT rewrite this assertion to something more clever since behaviors
+    //  like TypeName.equals may subvert the correct partitioning of package and names.
+    val hi = Sup.Hi::class.asClassName()
+    assertThat(hi.packageName).isEqualTo("com.squareup.kotlinpoet.Cased.Weird")
+    assertThat(hi.simpleNames).containsExactly("Sup", "Hi").inOrder()
+  }
+
+  @Test fun classNameFromKClassSpecialCases() {
+    assertEquals(ClassName(listOf("kotlin", "Boolean", "Companion")), Boolean.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Byte", "Companion")), Byte.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Char", "Companion")), Char.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Double", "Companion")), Double.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Enum", "Companion")), Enum.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Float", "Companion")), Float.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Int", "Companion")), Int.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Long", "Companion")), Long.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "Short", "Companion")), Short.Companion::class.asClassName())
+    assertEquals(ClassName(listOf("kotlin", "String", "Companion")), String.Companion::class.asClassName())
   }
 
   @Test fun peerClass() {
@@ -188,9 +208,8 @@ class ClassNameTest {
       |package com.squareup.tacos
       |
       |import com.squareup.`taco factory`.`Taco Factory`
-      |import kotlin.Unit
       |
-      |public fun main(): Unit {
+      |public fun main() {
       |  println(`Taco Factory`.produceTacos())
       |}
       |""".trimMargin()
@@ -219,5 +238,145 @@ class ClassNameTest {
       "simpleNames must not contain empty items: " +
         "[Foo, Bar, ]"
     )
+  }
+
+  @Test fun equalsAndHashCode() {
+    val foo1 = ClassName(names = listOf("com.example", "Foo"))
+    val foo2 = ClassName(names = listOf("com.example", "Foo"))
+    assertThat(foo1).isEqualTo(foo2)
+    assertThat(foo1.hashCode()).isEqualTo(foo2.hashCode())
+  }
+
+  @Test fun equalsDifferentiatesPackagesFromSimpleNames() {
+    val outerFoo = ClassName("com.example.Foo", "Bar")
+    val packageFoo = ClassName("com.example", "Foo", "Bar")
+
+    assertThat(outerFoo).isNotEqualTo(packageFoo)
+  }
+
+  @Test fun equalsDifferentiatesNullabilityAndAnnotations() {
+    val foo = ClassName(names = listOf("com.example", "Foo"))
+    assertThat(foo.copy(annotations = listOf(AnnotationSpec.Builder(Suppress::class.asClassName()).build()))).isNotEqualTo(foo)
+    assertThat(foo.copy(nullable = true)).isNotEqualTo(foo)
+  }
+
+  @Test fun equalsAndHashCodeIgnoreTags() {
+    val foo = ClassName(names = listOf("com.example", "Foo"))
+    val taggedFoo = foo.copy(tags = mapOf(String::class to "test"))
+
+    assertThat(foo).isEqualTo(taggedFoo)
+    assertThat(foo.hashCode()).isEqualTo(taggedFoo.hashCode())
+  }
+
+  @Test fun compareTo() {
+    val robot = ClassName("com.example", "Robot")
+    val robotMotor = ClassName("com.example", "Robot", "Motor")
+    val roboticVacuum = ClassName("com.example", "RoboticVacuum")
+
+    val list = listOf(robot, robotMotor, roboticVacuum)
+
+    assertThat(list.sorted()).isEqualTo(listOf(robot, robotMotor, roboticVacuum))
+  }
+
+  @Test fun compareToConsistentWithEquals() {
+    val foo1 = ClassName(names = listOf("com.example", "Foo"))
+    val foo2 = ClassName(names = listOf("com.example", "Foo"))
+    assertThat(foo1.compareTo(foo2)).isEqualTo(0)
+  }
+
+  @Test fun compareToDifferentiatesPackagesFromSimpleNames() {
+    val parentFooNestedBar = ClassName("com.example", "Foo", "Bar")
+    val packageFooClassBar = ClassName("com.example.Foo", "Bar")
+    val parentFooNestedBaz = ClassName("com.example", "Foo", "Baz")
+    val packageFooClassBaz = ClassName("com.example.Foo", "Baz")
+    val parentGooNestedBar = ClassName("com.example", "Goo", "Bar")
+    val packageGooClassBar = ClassName("com.example.Goo", "Bar")
+
+    val list = listOf(
+      parentFooNestedBar,
+      packageFooClassBar,
+      parentFooNestedBaz,
+      packageFooClassBaz,
+      parentGooNestedBar,
+      packageGooClassBar,
+    )
+
+    assertThat(list.sorted()).isEqualTo(
+      listOf(
+        parentFooNestedBar,
+        parentFooNestedBaz,
+        parentGooNestedBar,
+        packageFooClassBar,
+        packageFooClassBaz,
+        packageGooClassBar,
+      ),
+    )
+  }
+
+  @Test fun compareToDifferentiatesNullabilityAndAnnotations() {
+    val plain = ClassName(
+      listOf("com.example", "Foo")
+    )
+    val nullable = ClassName(
+      listOf("com.example", "Foo"),
+      nullable = true,
+    )
+    val annotated = ClassName(
+      listOf("com.example", "Foo"),
+      nullable = true,
+      annotations = listOf(
+        AnnotationSpec.Builder(Suppress::class.asClassName()).build(),
+      ),
+    )
+
+    val list = listOf(plain, nullable, annotated)
+
+    assertThat(list.sorted()).isEqualTo(
+      listOf(plain, nullable, annotated),
+    )
+  }
+
+  @Test fun compareToDifferentiatesByAnnotation() {
+    val noAnnotations = ClassName(listOf("com.example", "Foo"))
+
+    val oneAnnotation = ClassName(
+      listOf("com.example", "Foo"),
+      annotations = listOf(AnnotationSpec.Builder(Suppress::class.asClassName()).build()),
+    )
+    val twoAnnotations = ClassName(
+      listOf("com.example", "Foo"),
+      annotations = listOf(
+        AnnotationSpec.Builder(Suppress::class.asClassName()).build(),
+        AnnotationSpec.Builder(Test::class.asClassName()).build(),
+      ),
+    )
+    val secondAnnotationOnly = ClassName(
+      listOf("com.example", "Foo"),
+      annotations = listOf(
+        AnnotationSpec.Builder(Test::class.asClassName()).build(),
+      ),
+    )
+
+    val list = listOf(noAnnotations, oneAnnotation, twoAnnotations, secondAnnotationOnly)
+
+    assertThat(list.sorted()).isEqualTo(
+      listOf(noAnnotations, oneAnnotation, twoAnnotations, secondAnnotationOnly),
+    )
+  }
+
+  @Test fun compareToDoesNotDifferentiateByTag() {
+    val noTags = ClassName(listOf("com.example", "Foo"))
+
+    val oneTag = ClassName(
+      listOf("com.example", "Foo"),
+      tags = mapOf(String::class to "test"),
+    )
+    val twoTags = ClassName(
+      listOf("com.example", "Foo"),
+      tags = mapOf(String::class to "test", Int::class to 1),
+    )
+
+    assertThat(noTags.compareTo(oneTag)).isEqualTo(0)
+    assertThat(oneTag.compareTo(twoTags)).isEqualTo(0)
   }
 }

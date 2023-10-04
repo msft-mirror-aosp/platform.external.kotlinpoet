@@ -33,7 +33,7 @@ import javax.lang.model.type.NoType
 import javax.lang.model.type.PrimitiveType
 import javax.lang.model.type.TypeKind
 import javax.lang.model.type.TypeMirror
-import javax.lang.model.util.SimpleTypeVisitor7
+import javax.lang.model.util.SimpleTypeVisitor8
 import kotlin.reflect.KClass
 import kotlin.reflect.typeOf
 
@@ -66,8 +66,8 @@ public sealed class TypeName constructor(
   public val isNullable: Boolean,
   annotations: List<AnnotationSpec>,
   internal val tagMap: TagMap,
-) : Taggable by tagMap {
-  public val annotations: List<AnnotationSpec> = annotations.toImmutableList()
+) : Taggable by tagMap, Annotatable {
+  override val annotations: List<AnnotationSpec> = annotations.toImmutableList()
 
   /** Lazily-initialized toString of this type name.  */
   private val cachedString: String by lazy {
@@ -95,12 +95,22 @@ public sealed class TypeName constructor(
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
-    if (other == null) return false
-    if (javaClass != other.javaClass) return false
-    return toString() == other.toString()
+    if (javaClass != other?.javaClass) return false
+
+    other as TypeName
+
+    if (isNullable != other.isNullable) return false
+    if (annotations != other.annotations) return false
+    // do not check for equality of tags, these are considered side-channel data
+
+    return true
   }
 
-  override fun hashCode(): Int = toString().hashCode()
+  override fun hashCode(): Int {
+    var result = isNullable.hashCode()
+    result = 31 * result + annotations.hashCode()
+    return result
+  }
 
   override fun toString(): String = cachedString
 
@@ -125,7 +135,7 @@ public sealed class TypeName constructor(
       typeVariables: Map<TypeParameterElement, TypeVariableName>,
     ): TypeName {
       return mirror.accept(
-        object : SimpleTypeVisitor7<TypeName, Void?>() {
+        object : SimpleTypeVisitor8<TypeName, Void?>() {
           override fun visitPrimitive(t: PrimitiveType, p: Void?): TypeName {
             return when (t.kind) {
               TypeKind.BOOLEAN -> BOOLEAN
